@@ -61,7 +61,49 @@ app.frame("/", (c) => {
 
             gap: "20px",
           }}
-        ></div>
+        >
+          <h1
+            style={{
+              fontSize: "4rem",
+              textAlign: "center",
+              color: "#0052ff",
+            }}
+          >
+            BASED
+          </h1>
+          <h1
+            style={{
+              fontSize: "4rem",
+              textAlign: "center",
+              color: "white",
+              fontWeight: "bolder",
+            }}
+          >
+            FAUCET DRIPPER
+          </h1>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            fontSize: "2rem",
+            padding: "10px",
+            borderRadius: "10px",
+            color: "white",
+          }}
+        >
+          <ul
+            style={{
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <li>✅ You will receive Faucet on the verified address</li>
+            <li>✅ You can only claim once in 24 Hours</li>
+            <li>✅ You can claim 0.01 ETH per claim</li>
+          </ul>
+        </div>
         <p
           style={{
             fontSize: "2rem",
