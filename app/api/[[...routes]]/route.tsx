@@ -1,6 +1,10 @@
 /** @jsxImportSource frog/jsx */
 
 import { Button, Frog, TextInput } from "frog";
+import {
+  generateCaptchaChallenge,
+  validateCaptchaChallenge,
+} from "@airstack/frog";
 type State = {
   captchaId: string;
   valueHash: string;
@@ -117,5 +121,129 @@ app.frame("/", (c) => {
       </div>
     ),
     intents: [<Button action="/generate-captcha">Verify Captcha</Button>],
+  });
+});
+
+app.frame("/generate-captcha", async (c) => {
+  const { deriveState } = c ?? {};
+  const { state, data } = await generateCaptchaChallenge();
+  // The 2 numbers generated can be used to generate custom Frame image
+  const { numA, numB } = data;
+
+  deriveState((previousState: any) => {
+    // Store `state` data into Frames state
+    previousState.captchaId = state.captchaId;
+    previousState.valueHash = state.valueHash;
+  });
+  return c.res({
+    image: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundSize: "100% 100%",
+          backgroundColor: "#000",
+          color: "white",
+          fontSize: "2rem",
+          borderRadius: "10px",
+          margin: "auto",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "60%",
+            display: "flex",
+            margin: "20px",
+          }}
+        >
+          Prove me you are not a bot, like out @faucetbot
+        </div>
+        <div style={{ display: "flex", fontSize: "7rem" }}>
+          {numA} + {numB} = ?
+        </div>
+      </div>
+    ),
+    intents: [
+      <TextInput placeholder="Type Here!" />,
+      <Button action="/verify-captcha">Verify</Button>,
+    ],
+  });
+});
+
+app.frame("/verify-captcha", async (c) => {
+  const { inputText, deriveState } = c ?? {};
+  const state = deriveState() as CaptchaState;
+
+  // check if the state is being passed correctly
+  console.log("state", state);
+  const { isValidated, image } = await validateCaptchaChallenge({
+    inputText: inputText ?? "",
+    state: state ?? {
+      captchaId: "",
+      valueHash: "",
+    },
+  });
+  deriveState((previousState: any) => {
+    // Clear Frames state
+    previousState.captchaId = "";
+    previousState.valueHash = "";
+  });
+  return c.res({
+    image: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundSize: "100% 100%",
+          backgroundColor: "#000",
+          color: "white",
+          fontSize: "2rem",
+          borderRadius: "10px",
+          margin: "auto",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        {isValidated ? (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <h1>✅ You are not a bot! ✅ </h1>
+            <h1>Now Let's get you some faucet ➕</h1>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <h1>🤖 You are a bot! 🤖</h1>
+            <h5>OR</h5>
+            <h1>➕You suck at Math like us➕</h1>
+          </div>
+        )}
+      </div>
+    ),
+    intents: [
+      <Button action={isValidated ? "/faucet" : "/generate-captcha"}>
+        {isValidated ? "Get Your Faucet" : "Try Again?"}
+      </Button>,
+    ],
   });
 });
