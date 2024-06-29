@@ -5,6 +5,21 @@ import {
   generateCaptchaChallenge,
   validateCaptchaChallenge,
 } from "@airstack/frog";
+
+import { devtools } from "frog/dev";
+// import { neynar } from 'frog/hubs'
+import { handle } from "frog/next";
+import { serveStatic } from "frog/serve-static";
+
+import { replyMessageError, replyMessageSuccess } from "@/constants";
+import {
+  isTokenDrippedToAddressInLast24Hours,
+  isBalanceAboveThreshold,
+  isTokenDrippedToFidInLast24Hours,
+  dripTokensToAddress,
+} from "@/utils/contract";
+import { isNewAccount } from "@/utils/index";
+
 type State = {
   captchaId: string;
   valueHash: string;
@@ -247,3 +262,139 @@ app.frame("/verify-captcha", async (c) => {
     ],
   });
 });
+
+app.frame("/faucet", async (c) => {
+  const { frameData } = c;
+  const fid = c.frameData?.fid;
+  console.log("fid", fid);
+
+  // const fid = 41;
+  // const userAddress = "0xd5Ba400e732b3d769aA75fc67649Ef4849774bb1";
+
+  let fundsToSend = "10000000000000000";
+  let isEligibleForFaucet = false;
+  let success = false;
+  let link;
+
+  let msg = "";
+  if (!fid) {
+    msg = replyMessageError("no-fid");
+  } else {
+    const response = await fetch(
+      `https://api.neynar.com/v2/farcaster/user/bulk?fids=${fid}`,
+      {
+        method: "GET",
+        headers: {
+          accept: "application/json",
+          api_key: process.env.NEYNAR_API_KEY || "NEYNAR_API_DOCS",
+        },
+      }
+    );
+    const userData = await response.json();
+    const userAddresses = userData?.users[0]?.verified_addresses?.eth_addresses;
+
+    if (userAddresses.length === 0) {
+      msg = replyMessageError("no-address");
+    } else {
+      let userAddress = userAddresses[0];
+      if (!userAddress) {
+        msg = replyMessageError("no-address");
+      } else if (
+        await isTokenDrippedToAddressInLast24Hours(userAddress, "base-sepolia")
+      ) {
+        msg = replyMessageError("already-dripped-to-address") + userAddress;
+      } else if (await isTokenDrippedToFidInLast24Hours(fid, "base-sepolia")) {
+        msg = replyMessageError("already-dripped-to-fid") + fid;
+      } else if (await isBalanceAboveThreshold(userAddress, "base-sepolia")) {
+        msg = replyMessageError("enough-funds");
+      } else if (!(await isNewAccount(userAddress, "base-sepolia"))) {
+        isEligibleForFaucet = true;
+        fundsToSend = "20000000000000000";
+      } else {
+        isEligibleForFaucet = true;
+      }
+
+      if (isEligibleForFaucet) {
+        msg = replyMessageSuccess(
+          "base-sepolia",
+          BigInt(fundsToSend),
+          userAddress as string
+        );
+        try {
+          const hash = await dripTokensToAddress(
+            userAddress as string,
+            fid as number,
+            BigInt(fundsToSend),
+            "base-sepolia"
+          );
+          console.log("hash", hash);
+          if (!hash) {
+            msg = replyMessageError("error-sending-transaction");
+            //  do not run the code below
+          } else {
+            success = true;
+            link = `https://sepolia.basescan.org/tx/${hash}`;
+            msg = replyMessageSuccess(
+              "base-sepolia",
+              BigInt(fundsToSend),
+              hash
+            );
+          }
+        } catch (error) {
+          console.log("error", error);
+          msg = replyMessageError("error-sending-transaction");
+        }
+      }
+    }
+  }
+
+  console.log("msg", msg);
+
+  return c.res({
+    image: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundSize: "100% 100%",
+          backgroundColor: "#000",
+          color: "white",
+          fontSize: "2rem",
+          borderRadius: "10px",
+          margin: "auto",
+          width: "100%",
+          height: "100%",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "60%",
+            color: "white",
+          }}
+        >
+          {msg}
+          {/* Drip you faucet : {msg} */}
+        </div>
+      </div>
+    ),
+    intents: [
+      success ? (
+        <Button.Link href={link as string}>See Transaction</Button.Link>
+      ) : (
+        <Button action="/">Try Again Later</Button>
+      ),
+    ],
+  });
+});
+
+devtools(app, { serveStatic });
+
+export const GET = handle(app);
+export const POST = handle(app);
