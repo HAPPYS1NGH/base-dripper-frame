@@ -120,7 +120,8 @@ app.frame("/", (c) => {
           >
             <li>✅ You will receive Faucet on the verified address</li>
             <li>✅ You can only claim once in 24 Hours</li>
-            <li>✅ You can claim 0.01 ETH per claim</li>
+            <li>✅ You can claim 0.01 ETH per day</li>
+            <li>✅ Builder Score {`>`} 20 can claim 0.02 ETH. </li>
           </ul>
         </div>
         <p
@@ -307,7 +308,9 @@ app.frame("/faucet", async (c) => {
         msg = replyMessageError("already-dripped-to-fid") + fid;
       } else if (await isBalanceAboveThreshold(userAddress, "base-sepolia")) {
         msg = replyMessageError("enough-funds");
-      } else if (!(await isNewAccount(userAddress, "base-sepolia"))) {
+      }
+      // Checks Build Score > 20
+      else if (!(await isNewAccount(userAddress))) {
         isEligibleForFaucet = true;
         fundsToSend = "20000000000000000";
       } else {

@@ -27,14 +27,16 @@ async function getBalance(address: string, chain: string) {
   return balanceAsEther;
 }
 
-// Function to return false if the user has new account
-export async function isNewAccount(address: string, network: string) {
+// Function to return true if user Build Score less than 20
+export async function isNewAccount(address: string) {
   try {
-
-    const l2Balance = await getBalance(address, network.split("-")[0]);
-    const mainnetBalance = await getBalance(address, "mainnet");
+    const response = await fetch(`https://api.talentprotocol.com/api/v2/passports/${address.toLowerCase()}`, {
+      method: 'GET',
+      headers: {},
+    });
+    const data = await response.json();
     return (
-      parseFloat(l2Balance) < 0.001 && parseFloat(mainnetBalance) < 0.001
+      data?.passport?.buildScore < 20
     );
   } catch (error) {
     console.error("Error in isNewAccount", error);
